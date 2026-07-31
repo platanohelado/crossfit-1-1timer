@@ -19,6 +19,7 @@
       --border: #334155;
       --work: #16a34a;
       --rest: #f59e0b;
+      --rest-button: #7c3aed;
       --danger: #dc2626;
       --button-text: #ffffff;
     }
@@ -62,7 +63,7 @@
     button:disabled { opacity: .5; cursor: not-allowed; }
     .primary { background: var(--work); color: var(--button-text); transition: background .2s, color .2s, transform .08s; }
     .primary:active { transform: scale(.99); }
-    .primary.resting { background: var(--rest); color: #111827; }
+    .primary.resting { background: var(--rest-button); color: var(--button-text); }
     .secondary { color: var(--text); background: var(--panel-2); border: 1px solid var(--border); }
     .danger { color: #fecaca; }
     .callout { margin-top: 12px; padding: 13px; border-radius: 14px; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.5); }
