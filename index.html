@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="En enkel CrossFit-timer med arbetsvarv och tidsanpassad vila.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <title>CrossFit Timer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --work: #16a34a;
+      --rest: #f59e0b;
+      --danger: #dc2626;
+      --button-text: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom); }
+    main { width: min(760px, 100%); margin: 0 auto; padding: 16px 0 30px; }
+    h1 { margin: 0 0 4px; font-size: 1.45rem; }
+    .subtitle { margin: 0 0 18px; color: var(--muted); }
+    .grid { display: grid; gap: 10px; }
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric, .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; }
+    .metric { padding: 12px; }
+    .metric span { display: block; color: var(--muted); font-size: .78rem; margin-bottom: 3px; }
+    .metric strong { font-size: 1.2rem; }
+    .panel { padding: 14px; margin-top: 12px; }
+    .settings { grid-template-columns: 1fr; }
+    label { display: block; font-size: .9rem; }
+    input, select {
+      width: 100%; margin-top: 6px; border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px; font: inherit; color: var(--text); background: var(--panel-2);
+    }
+    .switch-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .switch-row input { width: 22px; height: 22px; margin: 0; }
+    .timer { text-align: center; padding: 28px 8px 18px; }
+    .phase {
+      display: inline-block; padding: 5px 11px; border-radius: 999px;
+      background: var(--panel-2); font-size: .8rem; font-weight: 700; letter-spacing: .08em;
+    }
+    .time { font-size: clamp(3.4rem, 17vw, 6.5rem); font-variant-numeric: tabular-nums; font-weight: 750; line-height: 1; margin: 18px 0 10px; }
+    .hint { color: var(--muted); min-height: 1.5em; margin: 0; }
+    .progress { height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin-top: 18px; }
+    .progress > div { height: 100%; width: 0; background: var(--work); transition: width .15s linear, background .2s; }
+    .buttons { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    button {
+      min-height: 58px; border: 0; border-radius: 15px; padding: 13px 16px;
+      font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .primary { background: var(--work); color: var(--button-text); transition: background .2s, color .2s, transform .08s; }
+    .primary:active { transform: scale(.99); }
+    .primary.resting { background: var(--rest); color: #111827; }
+    .secondary { color: var(--text); background: var(--panel-2); border: 1px solid var(--border); }
+    .danger { color: #fecaca; }
+    .callout { margin-top: 12px; padding: 13px; border-radius: 14px; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.5); }
+    .hidden { display: none; }
+    .log-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .log-head h2 { font-size: 1rem; margin: 0; }
+    .muted { color: var(--muted); font-size: .85rem; }
+    .round-row { display: grid; grid-template-columns: .65fr 1fr 1fr; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .round-row:last-child { border-bottom: 0; }
+    .round-row small { display: block; color: var(--muted); margin-bottom: 2px; }
+    .install-note { margin-top: 14px; color: var(--muted); font-size: .82rem; text-align: center; }
+    @media (min-width: 560px) {
+      .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .settings { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .buttons { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>CrossFit Timer</h1>
+  <p class="subtitle">Arbetsvarv med automatiskt tidsanpassad vila.</p>
+
+  <section class="grid metrics" aria-label="Träningsstatus">
+    <div class="metric"><span>Fas</span><strong id="phaseLabel">Redo</strong></div>
+    <div class="metric"><span>Varv</span><strong id="roundLabel">1</strong></div>
+    <div class="metric"><span>Arbetstid</span><strong id="workTimeSmall">00:00.0</strong></div>
+    <div class="metric"><span>Total tid</span><strong id="totalTime">00:00</strong></div>
+  </section>
+
+  <section class="panel">
+    <div class="grid settings">
+      <label>Antal varv
+        <input id="roundTarget" type="number" min="1" max="99" value="6">
+      </label>
+      <label>Vila mot arbete
+        <select id="restRatio">
+          <option value="0">Ingen automatisk vila</option>
+          <option value="0.5">1:0,5</option>
+          <option value="1" selected>1:1</option>
+          <option value="1.5">1:1,5</option>
+          <option value="2">1:2</option>
+        </select>
+      </label>
+      <label>Extra vila, sekunder
+        <input id="extraRest" type="number" min="0" max="3600" value="0">
+      </label>
+    </div>
+    <label class="switch-row">
+      <input id="autoStart" type="checkbox" checked>
+      <span>Starta nästa arbetsvarv automatiskt</span>
+    </label>
+  </section>
+
+  <section class="timer" aria-live="polite">
+    <div id="phaseBadge" class="phase">REDO</div>
+    <div id="mainTime" class="time">00:00.0</div>
+    <p id="timerHint" class="hint">Tryck Starta pass när du börjar första varvet.</p>
+    <div class="progress"><div id="progressBar"></div></div>
+  </section>
+
+  <section class="buttons">
+    <button id="primaryButton" class="primary" type="button">Starta pass</button>
+    <button id="pauseButton" class="secondary" type="button" disabled>Pausa hela timern</button>
+    <button id="skipRestButton" class="secondary" type="button" disabled>Hoppa över vilan</button>
+    <button id="resetButton" class="secondary danger" type="button">Nollställ</button>
+  </section>
+
+  <div id="restCallout" class="callout hidden" aria-live="assertive">
+    <strong>Vila</strong>
+    <div id="restExplanation" class="muted"></div>
+  </div>
+
+  <section class="panel">
+    <div class="log-head">
+      <h2>Registrerade varv</h2>
+      <span id="averageTime" class="muted">Snitt: –</span>
+    </div>
+    <div id="emptyLog" class="muted" style="padding-top:12px">Inga varv registrerade ännu.</div>
+    <div id="roundLog"></div>
+  </section>
+
+  <p class="install-note">Installera via Chrome-menyn → Lägg till på startskärmen eller Installera app.</p>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const els = {
+    phaseLabel: $('phaseLabel'), roundLabel: $('roundLabel'),
+    workTimeSmall: $('workTimeSmall'), totalTime: $('totalTime'),
+    roundTarget: $('roundTarget'), restRatio: $('restRatio'),
+    extraRest: $('extraRest'), autoStart: $('autoStart'),
+    phaseBadge: $('phaseBadge'), mainTime: $('mainTime'),
+    timerHint: $('timerHint'), progressBar: $('progressBar'),
+    primaryButton: $('primaryButton'), pauseButton: $('pauseButton'),
+    skipRestButton: $('skipRestButton'), resetButton: $('resetButton'),
+    restCallout: $('restCallout'), restExplanation: $('restExplanation'),
+    emptyLog: $('emptyLog'), roundLog: $('roundLog'), averageTime: $('averageTime')
+  };
+
+  const state = {
+    phase: 'ready', round: 1, rounds: [], phaseStartedAt: null,
+    totalStartedAt: null, phaseElapsedBeforePause: 0,
+    totalPausedDuration: 0, pauseStartedAt: null, paused: false,
+    restDuration: 0, raf: null
+  };
+
+  function formatMs(ms, tenths = true) {
+    const safe = Math.max(0, ms);
+    const minutes = Math.floor(safe / 60000);
+    const seconds = Math.floor((safe % 60000) / 1000);
+    const tenth = Math.floor((safe % 1000) / 100);
+    return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}${tenths ? '.' + tenth : ''}`;
+  }
+
+  function phaseElapsed(now = performance.now()) {
+    if (!state.phaseStartedAt || state.paused) return state.phaseElapsedBeforePause;
+    return state.phaseElapsedBeforePause + now - state.phaseStartedAt;
+  }
+
+  function totalElapsed(now = performance.now()) {
+    if (!state.totalStartedAt) return 0;
+    const activePause = state.paused && state.pauseStartedAt ? now - state.pauseStartedAt : 0;
+    return now - state.totalStartedAt - state.totalPausedDuration - activePause;
+  }
+
+  function setPhase(phase) {
+    state.phase = phase;
+    const names = { ready:'Redo', work:'Arbete', rest:'Vila', waiting:'Redo', complete:'Klar' };
+    els.phaseLabel.textContent = names[phase];
+    els.phaseBadge.textContent = names[phase].toUpperCase();
+    els.restCallout.classList.toggle('hidden', phase !== 'rest');
+    els.skipRestButton.disabled = phase !== 'rest';
+    els.primaryButton.classList.toggle('resting', phase === 'rest');
+    els.progressBar.style.background = phase === 'rest' ? 'var(--rest)' : 'var(--work)';
+  }
+
+  function beginPhase(phase) {
+    state.phaseElapsedBeforePause = 0;
+    state.phaseStartedAt = performance.now();
+    setPhase(phase);
+  }
+
+  function startWorkout() {
+    state.totalStartedAt = performance.now();
+    state.totalPausedDuration = 0;
+    state.round = 1;
+    els.roundLabel.textContent = state.round;
+    beginWork();
+    els.pauseButton.disabled = false;
+  }
+
+  function beginWork() {
+    beginPhase('work');
+    els.primaryButton.textContent = 'Klar med varvet';
+    els.timerHint.textContent = 'Tryck när hela arbetsvarvet är färdigt.';
+    els.progressBar.style.width = '0%';
+  }
+
+  function finishWork() {
+    const workMs = phaseElapsed();
+    const target = Math.max(1, Number(els.roundTarget.value) || 1);
+    const ratio = Math.max(0, Number(els.restRatio.value) || 0);
+    const extraMs = Math.max(0, Number(els.extraRest.value) || 0) * 1000;
+    const restMs = workMs * ratio + extraMs;
+
+    state.rounds.push({ round: state.round, workMs, restMs });
+    renderLog();
+
+    if (state.round >= target) {
+      completeWorkout();
+      return;
+    }
+
+    state.restDuration = restMs;
+    if (restMs <= 0) {
+      state.round++;
+      els.roundLabel.textContent = state.round;
+      beginWork();
+      return;
+    }
+
+    beginPhase('rest');
+    els.primaryButton.textContent = 'Starta nästa varv nu';
+    els.timerHint.textContent = 'Vilan räknar ned från senaste arbetsvarvet.';
+    els.restExplanation.textContent = `Varv ${state.round}: ${formatMs(workMs)} arbete ger ${formatMs(restMs)} vila.`;
+  }
+
+  function finishRest(manual = false) {
+    state.round++;
+    els.roundLabel.textContent = state.round;
+    if (manual || els.autoStart.checked) {
+      beginWork();
+    } else {
+      state.phaseStartedAt = null;
+      state.phaseElapsedBeforePause = 0;
+      setPhase('waiting');
+      els.mainTime.textContent = '00:00.0';
+      els.primaryButton.textContent = 'Starta nästa varv';
+      els.timerHint.textContent = 'Vilan är slut. Starta nästa varv när du är redo.';
+      els.progressBar.style.width = '100%';
+    }
+  }
+
+  function completeWorkout() {
+    state.phaseStartedAt = null;
+    state.phaseElapsedBeforePause = 0;
+    setPhase('complete');
+    els.mainTime.textContent = formatMs(totalElapsed(), false);
+    els.primaryButton.textContent = 'Passet klart';
+    els.primaryButton.disabled = true;
+    els.pauseButton.disabled = true;
+    els.skipRestButton.disabled = true;
+    els.timerHint.textContent = `${state.rounds.length} varv registrerade.`;
+    els.progressBar.style.width = '100%';
+  }
+
+  function togglePause() {
+    const now = performance.now();
+    if (!state.paused) {
+      state.phaseElapsedBeforePause = phaseElapsed(now);
+      state.phaseStartedAt = null;
+      state.paused = true;
+      state.pauseStartedAt = now;
+      els.pauseButton.textContent = 'Fortsätt timern';
+      els.primaryButton.disabled = true;
+      els.skipRestButton.disabled = true;
+      els.timerHint.textContent = 'Hela passet är pausat.';
+    } else {
+      state.totalPausedDuration += now - state.pauseStartedAt;
+      state.pauseStartedAt = null;
+      state.paused = false;
+      state.phaseStartedAt = now;
+      els.pauseButton.textContent = 'Pausa hela timern';
+      els.primaryButton.disabled = false;
+      els.skipRestButton.disabled = state.phase !== 'rest';
+      els.timerHint.textContent = state.phase === 'work'
+        ? 'Tryck när hela arbetsvarvet är färdigt.'
+        : 'Vilan fortsätter att räknas ned.';
+    }
+  }
+
+  function renderLog() {
+    els.emptyLog.classList.toggle('hidden', state.rounds.length > 0);
+    els.roundLog.innerHTML = state.rounds.map(item => `
+      <div class="round-row">
+        <div><small>Varv</small><strong>${item.round}</strong></div>
+        <div><small>Arbete</small><strong>${formatMs(item.workMs)}</strong></div>
+        <div><small>Vila</small><strong>${formatMs(item.restMs)}</strong></div>
+      </div>`).join('');
+    if (state.rounds.length) {
+      const avg = state.rounds.reduce((s, x) => s + x.workMs, 0) / state.rounds.length;
+      els.averageTime.textContent = `Snitt: ${formatMs(avg)}`;
+    } else {
+      els.averageTime.textContent = 'Snitt: –';
+    }
+  }
+
+  function resetWorkout() {
+    cancelAnimationFrame(state.raf);
+    Object.assign(state, {
+      phase:'ready', round:1, rounds:[], phaseStartedAt:null,
+      totalStartedAt:null, phaseElapsedBeforePause:0,
+      totalPausedDuration:0, pauseStartedAt:null, paused:false,
+      restDuration:0, raf:null
+    });
+    setPhase('ready');
+    els.roundLabel.textContent = '1';
+    els.workTimeSmall.textContent = '00:00.0';
+    els.totalTime.textContent = '00:00';
+    els.mainTime.textContent = '00:00.0';
+    els.primaryButton.disabled = false;
+    els.primaryButton.textContent = 'Starta pass';
+    els.pauseButton.disabled = true;
+    els.pauseButton.textContent = 'Pausa hela timern';
+    els.skipRestButton.disabled = true;
+    els.timerHint.textContent = 'Tryck Starta pass när du börjar första varvet.';
+    els.progressBar.style.width = '0%';
+    renderLog();
+    tick();
+  }
+
+  function tick() {
+    const now = performance.now();
+    const elapsed = phaseElapsed(now);
+    els.totalTime.textContent = formatMs(totalElapsed(now), false);
+
+    if (state.phase === 'work') {
+      els.mainTime.textContent = formatMs(elapsed);
+      els.workTimeSmall.textContent = formatMs(elapsed);
+    } else if (state.phase === 'rest') {
+      const remaining = Math.max(0, state.restDuration - elapsed);
+      els.mainTime.textContent = formatMs(remaining);
+      const progress = state.restDuration ? Math.min(100, elapsed / state.restDuration * 100) : 100;
+      els.progressBar.style.width = `${progress}%`;
+      if (!state.paused && remaining <= 0) finishRest(false);
+    }
+    state.raf = requestAnimationFrame(tick);
+  }
+
+  els.primaryButton.addEventListener('click', () => {
+    if (state.phase === 'ready') startWorkout();
+    else if (state.phase === 'work') finishWork();
+    else if (state.phase === 'rest') finishRest(true);
+    else if (state.phase === 'waiting') beginWork();
+  });
+  els.pauseButton.addEventListener('click', togglePause);
+  els.skipRestButton.addEventListener('click', () => finishRest(true));
+  els.resetButton.addEventListener('click', resetWorkout);
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
+  }
+
+  setPhase('ready');
+  renderLog();
+  tick();
+})();
+</script>
+</body>
+</html>
