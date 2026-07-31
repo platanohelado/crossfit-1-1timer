@@ -19,13 +19,14 @@
       --border: #334155;
       --work: #16a34a;
       --rest: #f59e0b;
+      --rest-button: #7c3aed;
       --danger: #dc2626;
       --button-text: #ffffff;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom); }
-    main { width: min(760px, 100%); margin: 0 auto; padding: 16px 0 30px; }
+    body { padding: max(env(safe-area-inset-top), 10px) 14px max(env(safe-area-inset-bottom), 14px); }
+    main { width: min(760px, 100%); margin: 0 auto; padding: 10px 0 24px; }
     h1 { margin: 0 0 4px; font-size: 1.45rem; }
     .subtitle { margin: 0 0 18px; color: var(--muted); }
     .grid { display: grid; gap: 10px; }
@@ -43,6 +44,8 @@
     }
     .switch-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
     .switch-row input { width: 22px; height: 22px; margin: 0; }
+    .switches { display: grid; gap: 12px; margin-top: 16px; }
+    .switches .switch-row { margin-top: 0; min-height: 32px; }
     .timer { text-align: center; padding: 28px 8px 18px; }
     .phase {
       display: inline-block; padding: 5px 11px; border-radius: 999px;
@@ -60,7 +63,7 @@
     button:disabled { opacity: .5; cursor: not-allowed; }
     .primary { background: var(--work); color: var(--button-text); transition: background .2s, color .2s, transform .08s; }
     .primary:active { transform: scale(.99); }
-    .primary.resting { background: var(--rest); color: #111827; }
+    .primary.resting { background: var(--rest-button); color: var(--button-text); }
     .secondary { color: var(--text); background: var(--panel-2); border: 1px solid var(--border); }
     .danger { color: #fecaca; }
     .callout { margin-top: 12px; padding: 13px; border-radius: 14px; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.5); }
@@ -72,6 +75,19 @@
     .round-row:last-child { border-bottom: 0; }
     .round-row small { display: block; color: var(--muted); margin-bottom: 2px; }
     .install-note { margin-top: 14px; color: var(--muted); font-size: .82rem; text-align: center; }
+    .device-status { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 12px; }
+    .status-pill { padding: 5px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .75rem; }
+    .status-pill.active { color: #bbf7d0; border-color: rgba(22,163,74,.7); background: rgba(22,163,74,.12); }
+    @media (max-width: 559px) {
+      h1, .subtitle { text-align: center; }
+      .subtitle { margin-bottom: 14px; }
+      .metric { padding: 10px; }
+      .panel { padding: 13px; }
+      .timer { padding: 22px 4px 14px; }
+      .buttons { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
+      .buttons button { min-height: 54px; }
+      .buttons .primary { min-height: 64px; font-size: 1.12rem; }
+    }
     @media (min-width: 560px) {
       .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .settings { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -109,10 +125,24 @@
         <input id="extraRest" type="number" min="0" max="3600" value="0">
       </label>
     </div>
-    <label class="switch-row">
-      <input id="autoStart" type="checkbox" checked>
-      <span>Starta nästa arbetsvarv automatiskt</span>
-    </label>
+    <div class="switches">
+      <label class="switch-row">
+        <input id="autoStart" type="checkbox" checked>
+        <span>Starta nästa arbetsvarv automatiskt</span>
+      </label>
+      <label class="switch-row">
+        <input id="soundEnabled" type="checkbox" checked>
+        <span>Spela ljud när vilan är slut</span>
+      </label>
+      <label class="switch-row">
+        <input id="vibrationEnabled" type="checkbox" checked>
+        <span>Vibrera vid byte mellan arbete och vila</span>
+      </label>
+      <label class="switch-row">
+        <input id="wakeLockEnabled" type="checkbox" checked>
+        <span>Håll skärmen vaken under passet</span>
+      </label>
+    </div>
   </section>
 
   <section class="timer" aria-live="polite">
@@ -120,6 +150,10 @@
     <div id="mainTime" class="time">00:00.0</div>
     <p id="timerHint" class="hint">Tryck Starta pass när du börjar första varvet.</p>
     <div class="progress"><div id="progressBar"></div></div>
+    <div class="device-status" aria-label="Enhetsfunktioner">
+      <span id="wakeStatus" class="status-pill">Skärmlås: normalt</span>
+      <span id="offlineStatus" class="status-pill">Förbereder offline…</span>
+    </div>
   </section>
 
   <section class="buttons">
@@ -154,6 +188,9 @@
     workTimeSmall: $('workTimeSmall'), totalTime: $('totalTime'),
     roundTarget: $('roundTarget'), restRatio: $('restRatio'),
     extraRest: $('extraRest'), autoStart: $('autoStart'),
+    soundEnabled: $('soundEnabled'), vibrationEnabled: $('vibrationEnabled'),
+    wakeLockEnabled: $('wakeLockEnabled'), wakeStatus: $('wakeStatus'),
+    offlineStatus: $('offlineStatus'),
     phaseBadge: $('phaseBadge'), mainTime: $('mainTime'),
     timerHint: $('timerHint'), progressBar: $('progressBar'),
     primaryButton: $('primaryButton'), pauseButton: $('pauseButton'),
@@ -166,8 +203,98 @@
     phase: 'ready', round: 1, rounds: [], phaseStartedAt: null,
     totalStartedAt: null, phaseElapsedBeforePause: 0,
     totalPausedDuration: 0, pauseStartedAt: null, paused: false,
-    restDuration: 0, raf: null
+    restDuration: 0, raf: null, wakeLock: null, audioContext: null
   };
+
+  const SETTINGS_KEY = 'crossfit-timer-settings-v1';
+  const settingIds = ['roundTarget', 'restRatio', 'extraRest', 'autoStart', 'soundEnabled', 'vibrationEnabled', 'wakeLockEnabled'];
+
+  function loadSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+      if (!saved) return;
+      settingIds.forEach(id => {
+        if (!(id in saved)) return;
+        const input = els[id];
+        if (input.type === 'checkbox') input.checked = Boolean(saved[id]);
+        else input.value = saved[id];
+      });
+    } catch (_) {
+      localStorage.removeItem(SETTINGS_KEY);
+    }
+  }
+
+  function saveSettings() {
+    const settings = {};
+    settingIds.forEach(id => {
+      const input = els[id];
+      settings[id] = input.type === 'checkbox' ? input.checked : input.value;
+    });
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function workoutIsActive() {
+    return ['work', 'rest', 'waiting'].includes(state.phase);
+  }
+
+  async function requestWakeLock() {
+    if (state.wakeLock || !els.wakeLockEnabled.checked || !workoutIsActive() || document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;
+    try {
+      const lock = await navigator.wakeLock.request('screen');
+      if (!els.wakeLockEnabled.checked || !workoutIsActive() || document.visibilityState !== 'visible') {
+        await lock.release();
+        return;
+      }
+      state.wakeLock = lock;
+      els.wakeStatus.textContent = 'Skärmen hålls vaken';
+      els.wakeStatus.classList.add('active');
+      state.wakeLock.addEventListener('release', updateWakeStatus, { once: true });
+    } catch (_) {
+      updateWakeStatus();
+    }
+  }
+
+  function updateWakeStatus() {
+    state.wakeLock = null;
+    els.wakeStatus.textContent = 'Skärmlås: normalt';
+    els.wakeStatus.classList.remove('active');
+  }
+
+  async function releaseWakeLock() {
+    const lock = state.wakeLock;
+    updateWakeStatus();
+    if (lock) await lock.release();
+  }
+
+  function prepareAudio() {
+    if (!els.soundEnabled.checked || state.audioContext) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) state.audioContext = new AudioContext();
+  }
+
+  function playRestFinishedSound() {
+    if (!els.soundEnabled.checked) return;
+    prepareAudio();
+    const context = state.audioContext;
+    if (!context) return;
+    if (context.state === 'suspended') context.resume();
+    [0, .18, .36].forEach((delay, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = index === 2 ? 1046 : 784;
+      gain.gain.setValueAtTime(.0001, context.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(.35, context.currentTime + delay + .015);
+      gain.gain.exponentialRampToValueAtTime(.0001, context.currentTime + delay + .15);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(context.currentTime + delay);
+      oscillator.stop(context.currentTime + delay + .16);
+    });
+  }
+
+  function vibrate(pattern) {
+    if (els.vibrationEnabled.checked && 'vibrate' in navigator) navigator.vibrate(pattern);
+  }
 
   function formatMs(ms, tenths = true) {
     const safe = Math.max(0, ms);
@@ -211,6 +338,7 @@
     state.round = 1;
     els.roundLabel.textContent = state.round;
     beginWork();
+    requestWakeLock();
     els.pauseButton.disabled = false;
   }
 
@@ -245,12 +373,15 @@
     }
 
     beginPhase('rest');
+    vibrate([180, 80, 180]);
     els.primaryButton.textContent = 'Starta nästa varv nu';
     els.timerHint.textContent = 'Vilan räknar ned från senaste arbetsvarvet.';
     els.restExplanation.textContent = `Varv ${state.round}: ${formatMs(workMs)} arbete ger ${formatMs(restMs)} vila.`;
   }
 
   function finishRest(manual = false) {
+    if (!manual) playRestFinishedSound();
+    vibrate(manual ? 150 : [250, 100, 250, 100, 400]);
     state.round++;
     els.roundLabel.textContent = state.round;
     if (manual || els.autoStart.checked) {
@@ -277,6 +408,7 @@
     els.skipRestButton.disabled = true;
     els.timerHint.textContent = `${state.rounds.length} varv registrerade.`;
     els.progressBar.style.width = '100%';
+    releaseWakeLock();
   }
 
   function togglePause() {
@@ -341,6 +473,7 @@
     els.timerHint.textContent = 'Tryck Starta pass när du börjar första varvet.';
     els.progressBar.style.width = '0%';
     renderLog();
+    releaseWakeLock();
     tick();
   }
 
@@ -363,6 +496,7 @@
   }
 
   els.primaryButton.addEventListener('click', () => {
+    prepareAudio();
     if (state.phase === 'ready') startWorkout();
     else if (state.phase === 'work') finishWork();
     else if (state.phase === 'rest') finishRest(true);
@@ -372,10 +506,40 @@
   els.skipRestButton.addEventListener('click', () => finishRest(true));
   els.resetButton.addEventListener('click', resetWorkout);
 
+  settingIds.forEach(id => els[id].addEventListener('change', () => {
+    saveSettings();
+    if (id === 'soundEnabled' && els.soundEnabled.checked) prepareAudio();
+    if (id === 'wakeLockEnabled') {
+      if (els.wakeLockEnabled.checked) requestWakeLock();
+      else releaseWakeLock();
+    }
+  }));
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  window.addEventListener('online', () => {
+    els.offlineStatus.textContent = navigator.serviceWorker?.controller ? 'Offline redo' : 'Förbereder offline…';
+  });
+  window.addEventListener('offline', () => els.offlineStatus.textContent = 'Offline-läge');
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
+    window.addEventListener('load', async () => {
+      try {
+        await navigator.serviceWorker.register('./service-worker.js');
+        await navigator.serviceWorker.ready;
+        els.offlineStatus.textContent = 'Offline redo';
+        els.offlineStatus.classList.add('active');
+      } catch (_) {
+        els.offlineStatus.textContent = 'Offline ej tillgängligt';
+      }
+    });
+  } else {
+    els.offlineStatus.textContent = 'Offline ej tillgängligt';
   }
 
+  loadSettings();
   setPhase('ready');
   renderLog();
   tick();
